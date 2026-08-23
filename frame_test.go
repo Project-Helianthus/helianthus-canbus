@@ -70,6 +70,12 @@ func TestFrameDLCBoundariesAndImmutability(t *testing.T) {
 			if frame.DLC() != uint8(dlc) {
 				t.Fatalf("DLC = %d, want %d", frame.DLC(), dlc)
 			}
+			if frame.PayloadLength() != uint8(dlc) {
+				t.Fatalf("PayloadLength = %d, want %d", frame.PayloadLength(), dlc)
+			}
+			if frame.RawDLC() != uint8(dlc) {
+				t.Fatalf("RawDLC = %d, want %d", frame.RawDLC(), dlc)
+			}
 			if frame.ID() != id {
 				t.Fatalf("ID = %#v, want %#v", frame.ID(), id)
 			}

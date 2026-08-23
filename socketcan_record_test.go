@@ -13,9 +13,14 @@ const (
 )
 
 func socketCANFixture(rawID uint32, dlc byte, data ...byte) []byte {
+	return socketCANFixtureWithLen8DLC(rawID, dlc, 0, data...)
+}
+
+func socketCANFixtureWithLen8DLC(rawID uint32, payloadLength, len8DLC byte, data ...byte) []byte {
 	record := make([]byte, SocketCANRecordSize)
 	binary.NativeEndian.PutUint32(record[:4], rawID)
-	record[4] = dlc
+	record[4] = payloadLength
+	record[7] = len8DLC
 	copy(record[8:], data)
 	return record
 }
@@ -69,6 +74,28 @@ func TestDecodeSocketCANRecordDLCBoundaries(t *testing.T) {
 	}
 }
 
+func TestDecodeSocketCANRecordPreservesLen8DLC(t *testing.T) {
+	t.Parallel()
+
+	for _, rawDLC := range []byte{9, 15} {
+		t.Run(string(rune('0'+rawDLC)), func(t *testing.T) {
+			frame, err := DecodeSocketCANRecord(socketCANFixtureWithLen8DLC(0x123, 8, rawDLC, 1, 2, 3, 4, 5, 6, 7, 8))
+			if err != nil {
+				t.Fatalf("DecodeSocketCANRecord() error = %v", err)
+			}
+			if got := frame.PayloadLength(); got != 8 {
+				t.Fatalf("PayloadLength = %d, want 8", got)
+			}
+			if got := frame.DLC(); got != 8 {
+				t.Fatalf("DLC = %d, want payload length 8", got)
+			}
+			if got := frame.RawDLC(); got != rawDLC {
+				t.Fatalf("RawDLC = %d, want %d", got, rawDLC)
+			}
+		})
+	}
+}
+
 func TestDecodeSocketCANRecordRejectsUnsupportedAndMalformedRecords(t *testing.T) {
 	t.Parallel()
 
@@ -86,6 +113,9 @@ func TestDecodeSocketCANRecordRejectsUnsupportedAndMalformedRecords(t *testing.T
 		{name: "error frame", record: socketCANFixture(testErrorFlag|0x1, 8), want: ErrUnsupportedErrorFrame},
 		{name: "invalid standard identifier", record: socketCANFixture(0x800, 0), want: ErrInvalidIdentifier},
 		{name: "invalid dlc", record: socketCANFixture(0x123, MaxClassicDataLength+1), want: ErrInvalidDLC},
+		{name: "len8 dlc with short payload", record: socketCANFixtureWithLen8DLC(0x123, 7, 9), want: ErrInvalidDLC},
+		{name: "len8 dlc below extended range", record: socketCANFixtureWithLen8DLC(0x123, 8, 1), want: ErrInvalidDLC},
+		{name: "len8 dlc repeats payload length", record: socketCANFixtureWithLen8DLC(0x123, 8, 8), want: ErrInvalidDLC},
 	}
 
 	for _, tt := range tests {

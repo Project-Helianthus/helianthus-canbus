@@ -33,6 +33,8 @@ type matrixCase struct {
 	Extended          bool     `json:"extended,omitempty"`
 	RawID             string   `json:"raw_id,omitempty"`
 	DLC               int      `json:"dlc,omitempty"`
+	Len8DLC           int      `json:"len8_dlc,omitempty"`
+	ExpectedRawDLC    int      `json:"expected_raw_dlc,omitempty"`
 	RecordSize        int      `json:"record_size,omitempty"`
 	ExpectedError     string   `json:"expected_error,omitempty"`
 	ExpectedExtended  bool     `json:"expected_extended,omitempty"`
@@ -127,6 +129,9 @@ func runMatrixDecodeCase(t *testing.T, testCase matrixCase) {
 	if len(record) >= 5 {
 		record[4] = byte(testCase.DLC)
 	}
+	if len(record) >= 8 {
+		record[7] = byte(testCase.Len8DLC)
+	}
 	if len(record) >= 16 {
 		for i := 0; i < MaxClassicDataLength; i++ {
 			record[8+i] = byte(i + 1)
@@ -139,6 +144,16 @@ func runMatrixDecodeCase(t *testing.T, testCase matrixCase) {
 	}
 	if frame.DLC() != uint8(testCase.DLC) {
 		t.Fatalf("DLC = %d, want %d", frame.DLC(), testCase.DLC)
+	}
+	if frame.PayloadLength() != uint8(testCase.DLC) {
+		t.Fatalf("PayloadLength = %d, want %d", frame.PayloadLength(), testCase.DLC)
+	}
+	wantRawDLC := testCase.DLC
+	if testCase.ExpectedRawDLC != 0 {
+		wantRawDLC = testCase.ExpectedRawDLC
+	}
+	if frame.RawDLC() != uint8(wantRawDLC) {
+		t.Fatalf("RawDLC = %d, want %d", frame.RawDLC(), wantRawDLC)
 	}
 	if frame.ID().Extended() != testCase.ExpectedExtended {
 		t.Fatalf("extended = %t, want %t", frame.ID().Extended(), testCase.ExpectedExtended)

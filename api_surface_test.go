@@ -30,6 +30,21 @@ func TestListenerPublicSurfaceIsReceiveOnly(t *testing.T) {
 	}
 }
 
+func TestFramePublicSurfacePreservesPayloadAndWireDLC(t *testing.T) {
+	t.Parallel()
+
+	typeOfFrame := reflect.TypeOf(Frame{})
+	got := make([]string, 0, typeOfFrame.NumMethod())
+	for i := 0; i < typeOfFrame.NumMethod(); i++ {
+		got = append(got, typeOfFrame.Method(i).Name)
+	}
+	sort.Strings(got)
+	want := []string{"Bytes", "DLC", "Data", "ID", "PayloadLength", "RawDLC"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Frame methods = %v, want exactly %v", got, want)
+	}
+}
+
 func TestProductCodeHasNoOutboundOrMutationSurface(t *testing.T) {
 	t.Parallel()
 
