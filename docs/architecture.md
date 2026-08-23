@@ -4,8 +4,8 @@
 
 This module owns generic classic CAN acquisition and evidence transport:
 
-1. `Identifier` and `Frame` validate immutable standard/extended identifiers and
-   DLC-bounded payloads.
+1. `Identifier` and `Frame` validate immutable standard/extended identifiers,
+   decoded payload lengths, and raw wire DLC values.
 2. `DecodeSocketCANRecord` converts one fixed native-endian Linux `can_frame`
    record and rejects unsupported or malformed forms.
 3. An unexported receive backend isolates OS calls from portable behavior tests.
@@ -19,7 +19,9 @@ Profile interpretation and all higher-level semantics are downstream concerns.
 ## Invariants
 
 - The public `Listener` method set is exactly `Receive`, `Stats`, and `Close`.
-- A frame contains no data beyond its validated DLC.
+- A frame contains no data beyond its validated payload length. `DLC()` retains
+  its existing payload-length meaning, while `RawDLC()` preserves a valid Linux
+  `len8_dlc` value (`9..15`) only when the payload length is eight.
 - An observation returns payload and raw record bytes by copy.
 - Sequence starts at one and increases for each valid record before queue policy
   is applied. A gap therefore preserves overflow evidence.

@@ -56,13 +56,33 @@ func decodeSocketCANRecord(record []byte) (Frame, [SocketCANRecordSize]byte, err
 		return Frame{}, raw, err
 	}
 
-	dlc := int(record[4])
-	if dlc > MaxClassicDataLength {
-		return Frame{}, raw, fmt.Errorf("%w: %d exceeds %d", ErrInvalidDLC, dlc, MaxClassicDataLength)
+	payloadLength := record[4]
+	if payloadLength > MaxClassicDataLength {
+		return Frame{}, raw, fmt.Errorf("%w: payload length %d exceeds %d", ErrInvalidDLC, payloadLength, MaxClassicDataLength)
 	}
-	frame, err := NewFrame(identifier, record[8:8+dlc])
+	rawDLC, err := socketCANRawDLC(payloadLength, record[7])
+	if err != nil {
+		return Frame{}, raw, err
+	}
+	frame, err := newFrame(identifier, record[8:8+int(payloadLength)], rawDLC)
 	if err != nil {
 		return Frame{}, raw, err
 	}
 	return frame, raw, nil
+}
+
+func socketCANRawDLC(payloadLength, len8DLC byte) (uint8, error) {
+	if payloadLength != MaxClassicDataLength {
+		if len8DLC != 0 {
+			return 0, fmt.Errorf("%w: len8_dlc %d requires payload length %d", ErrInvalidDLC, len8DLC, MaxClassicDataLength)
+		}
+		return payloadLength, nil
+	}
+	if len8DLC == 0 {
+		return payloadLength, nil
+	}
+	if len8DLC >= 9 && len8DLC <= 15 {
+		return len8DLC, nil
+	}
+	return 0, fmt.Errorf("%w: len8_dlc %d is invalid for payload length %d", ErrInvalidDLC, len8DLC, payloadLength)
 }

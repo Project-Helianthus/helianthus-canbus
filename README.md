@@ -8,14 +8,15 @@ profile, register, and domain semantics belong outside this module.
 ## Scope
 
 - Standard 11-bit and extended 29-bit identifiers.
-- Classic CAN payloads with DLC `0..8`.
+- Classic CAN payloads with decoded length `0..8`; for Linux records with an
+  8-byte payload, raw wire DLC `9..15` is retained from `len8_dlc`.
 - Native Linux SocketCAN records (`struct can_frame`).
 - Immutable frame and raw-record copies with interface identity, listener-local
   sequence, and monotonic elapsed time.
 - Explicit bounded-queue policies: `DropNewest` and `DropOldest`.
 - Deterministic context cancellation and idempotent close.
 - Explicit rejection of CAN FD, RTR, error frames, malformed records, and
-  out-of-range identifiers or DLC values.
+  out-of-range identifiers, payload lengths, or `len8_dlc` combinations.
 
 The public transport surface contains only `Receive`, `Stats`, and `Close`.
 There is no frame-submission API, active probing, interface mutation, or
