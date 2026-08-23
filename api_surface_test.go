@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -40,26 +41,8 @@ func TestProductCodeHasNoOutboundOrMutationSurface(t *testing.T) {
 func TestTestsDoNotOpenAPlatformEndpoint(t *testing.T) {
 	t.Parallel()
 
-	for _, path := range goFiles(t, ".", true) {
-		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", path, err)
-		}
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			identifier, ok := call.Fun.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			switch identifier.Name {
-			case "ListenSocketCAN", "platformOpenSocketCAN":
-				t.Errorf("%s invokes live endpoint entry point %s", path, identifier.Name)
-			}
-			return true
-		})
+	if err := inspectTestSourceForEndpointCalls(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -98,7 +81,7 @@ func TestRepositoryHasNoDomainSpecificAssumptions(t *testing.T) {
 			return err
 		}
 		for _, term := range blocked {
-			if strings.Contains(strings.ToLower(string(contents)), strings.ToLower(term)) {
+			if containsForbiddenTerm(contents, term) {
 				return fmt.Errorf("%s contains forbidden term %q", path, term)
 			}
 		}
@@ -107,6 +90,14 @@ func TestRepositoryHasNoDomainSpecificAssumptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func containsForbiddenTerm(contents []byte, term string) bool {
+	if strings.ContainsAny(term, " +/") {
+		return strings.Contains(strings.ToLower(string(contents)), strings.ToLower(term))
+	}
+	pattern := `(?i)(^|[^a-z0-9])` + regexp.QuoteMeta(term) + `([^a-z0-9]|$)`
+	return regexp.MustCompile(pattern).Match(contents)
 }
 
 func TestPlatformFilesHaveExplicitBuildTags(t *testing.T) {
@@ -124,7 +115,7 @@ func inspectProductSource(root string) error {
 		}
 		for _, spec := range file.Imports {
 			importPath := strings.Trim(spec.Path.Value, "\"")
-			if strings.Contains(importPath, "netlink") || strings.Contains(importPath, "rtnetlink") {
+			if strings.Contains(importPath, "netlink") || strings.Contains(importPath, "rtnetlink") || importPath == "os/exec" {
 				return fmt.Errorf("%s imports interface-mutation package %q", path, importPath)
 			}
 		}
@@ -137,7 +128,9 @@ func inspectProductSource(root string) error {
 			switch typed := node.(type) {
 			case *ast.FuncDecl:
 				name := strings.ToLower(typed.Name.Name)
-				if strings.Contains(name, "send") || strings.Contains(name, "transmit") || strings.Contains(name, "writeframe") {
+				if strings.Contains(name, "send") || strings.Contains(name, "transmit") || strings.Contains(name, "writeframe") ||
+					strings.Contains(name, "outbound") || strings.Contains(name, "encode") || strings.Contains(name, "marshal") ||
+					name == "tx" || strings.HasPrefix(name, "tx") {
 					inspectionErr = fmt.Errorf("%s declares forbidden operation %s", path, typed.Name.Name)
 					return false
 				}
@@ -147,7 +140,7 @@ func inspectProductSource(root string) error {
 					return true
 				}
 				switch selector.Sel.Name {
-				case "Write", "WriteTo", "WriteMsg", "Send", "Sendto", "Sendmsg", "Transmit":
+				case "Write", "WriteTo", "WriteMsg", "Writev", "Pwrite", "Send", "Sendto", "Sendmsg", "Transmit":
 					inspectionErr = fmt.Errorf("%s calls forbidden operation %s", path, selector.Sel.Name)
 					return false
 				}
@@ -173,15 +166,6 @@ func inspectProductSource(root string) error {
 		}
 	}
 	return nil
-}
-
-func goFiles(t *testing.T, root string, testsOnly bool) []string {
-	t.Helper()
-	files := goFilesFromRoot(root, testsOnly)
-	if len(files) == 0 {
-		t.Fatalf("no Go files found below %s", root)
-	}
-	return files
 }
 
 func goFilesFromRoot(root string, testsOnly bool) []string {

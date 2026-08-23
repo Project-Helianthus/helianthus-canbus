@@ -174,6 +174,25 @@ func TestListenerObservationProvenanceIsImmutableAndMonotonic(t *testing.T) {
 	}
 }
 
+func TestInterfaceIdentityValidation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		index int
+	}{
+		{name: "", index: 1},
+		{name: "test-can0", index: 0},
+		{name: "test\x00can0", index: 1},
+		{name: "1234567890123456", index: 1},
+	}
+	for _, testCase := range tests {
+		if _, err := NewInterfaceIdentity(testCase.name, testCase.index); !errors.Is(err, ErrInvalidInterface) {
+			t.Fatalf("identity (%q, %d) error = %v, want %v", testCase.name, testCase.index, err, ErrInvalidInterface)
+		}
+	}
+}
+
 func TestListenerCancellationAndCloseAreDeterministic(t *testing.T) {
 	backend := newFakeReceiveBackend(t)
 	listener, err := newListener(backend, ListenerConfig{QueueCapacity: 1, OverflowPolicy: DropNewest}, time.Now)
@@ -227,7 +246,7 @@ func TestListenerRejectsNilContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = listener.Close() })
-	if _, err := listener.Receive(nil); !errors.Is(err, ErrNilContext) {
+	if _, err := listener.Receive(nil); !errors.Is(err, ErrNilContext) { //nolint:staticcheck // Deliberate contract check.
 		t.Fatalf("Receive(nil) error = %v, want %v", err, ErrNilContext)
 	}
 }
@@ -296,6 +315,7 @@ func TestInjectedOpenerErrorsAndConfigValidation(t *testing.T) {
 	}
 
 	tests := []ListenerConfig{
+		{QueueCapacity: 1},
 		{QueueCapacity: 0, OverflowPolicy: DropNewest},
 		{QueueCapacity: -1, OverflowPolicy: DropNewest},
 		{QueueCapacity: MaxQueueCapacity + 1, OverflowPolicy: DropNewest},
@@ -313,6 +333,13 @@ func TestInjectedOpenerErrorsAndConfigValidation(t *testing.T) {
 		if openerCalled {
 			t.Fatalf("config %+v: opener called before validation", config)
 		}
+	}
+
+	_, err = listenSocketCAN("test-can0", ListenerConfig{QueueCapacity: 1, OverflowPolicy: DropNewest}, func(string) (receiveBackend, error) {
+		return nil, nil
+	}, time.Now)
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("nil backend error = %v, want %v", err, ErrInvalidConfig)
 	}
 }
 

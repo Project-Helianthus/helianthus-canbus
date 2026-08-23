@@ -285,7 +285,7 @@ func runMatrixLifecycleCase(t *testing.T, testCase matrixCase) {
 	switch testCase.Scenario {
 	case "canceled_context":
 		listener, backend := matrixEmptyListener(t)
-		defer listener.Close()
+		cleanupMatrixListener(t, listener)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		_, err := listener.Receive(ctx)
@@ -295,7 +295,7 @@ func runMatrixLifecycleCase(t *testing.T, testCase matrixCase) {
 		_ = backend
 	case "deadline_context":
 		listener, _ := matrixEmptyListener(t)
-		defer listener.Close()
+		cleanupMatrixListener(t, listener)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 		defer cancel()
 		_, err := listener.Receive(ctx)
@@ -340,7 +340,7 @@ func runMatrixLifecycleCase(t *testing.T, testCase matrixCase) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer listener.Close()
+		cleanupMatrixListener(t, listener)
 		_, err = listener.Receive(context.Background())
 		if !errors.Is(err, failure) {
 			t.Fatalf("error = %v", err)
@@ -352,7 +352,7 @@ func runMatrixLifecycleCase(t *testing.T, testCase matrixCase) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer listener.Close()
+		cleanupMatrixListener(t, listener)
 		_, err = listener.Receive(context.Background())
 		if !errors.Is(err, ErrUnsupportedRTR) {
 			t.Fatalf("error = %v", err)
@@ -366,8 +366,8 @@ func runMatrixLifecycleCase(t *testing.T, testCase matrixCase) {
 		}
 	case "nil_context":
 		listener, _ := matrixEmptyListener(t)
-		defer listener.Close()
-		_, err := listener.Receive(nil)
+		cleanupMatrixListener(t, listener)
+		_, err := listener.Receive(nil) //nolint:staticcheck // Deliberate contract check.
 		if !errors.Is(err, ErrNilContext) {
 			t.Fatalf("error = %v", err)
 		}
@@ -455,6 +455,15 @@ func matrixEmptyListener(t *testing.T) (Listener, *fakeReceiveBackend) {
 	return listener, backend
 }
 
+func cleanupMatrixListener(t *testing.T, listener Listener) {
+	t.Helper()
+	t.Cleanup(func() {
+		if err := listener.Close(); err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
+}
+
 func inspectTestSourceForEndpointCalls() error {
 	for _, path := range goFilesFromRoot(".", true) {
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
@@ -467,12 +476,15 @@ func inspectTestSourceForEndpointCalls() error {
 			if !ok {
 				return true
 			}
-			identifier, ok := call.Fun.(*ast.Ident)
-			if !ok {
-				return true
+			var name string
+			switch callable := call.Fun.(type) {
+			case *ast.Ident:
+				name = callable.Name
+			case *ast.SelectorExpr:
+				name = callable.Sel.Name
 			}
-			if identifier.Name == "ListenSocketCAN" || identifier.Name == "platformOpenSocketCAN" {
-				found = identifier.Name
+			if name == "ListenSocketCAN" || name == "platformOpenSocketCAN" {
+				found = name
 				return false
 			}
 			return true
