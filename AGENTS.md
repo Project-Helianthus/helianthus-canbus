@@ -1,4 +1,4 @@
-# Repository Rules
+# helianthus-canbus Contributor Guide
 
 ## Scope
 
@@ -13,12 +13,20 @@
 - Do not open a live CAN interface from tests. Use the receive-backend seam and
   byte fixtures.
 
+## Documentation
+
+The canonical public documentation destination for generic CAN transport and
+T01..T88 is
+https://github.com/Project-Helianthus/helianthus-docs-canbus. Keep vendor and
+product-profile material out of this repository.
+
 ## Workflow
 
 - Use one issue, one `issue/<id>-<slug>` branch, and one PR at a time.
 - Use RED-first tests for transport, concurrency, lifecycle, and safety behavior.
 - Keep the T01..T88 matrix exact, machine-readable, receive-only, and green.
-- Run `./scripts/ci_local.sh` before review.
+- Run `./scripts/ci_local.sh` before push; it includes the exact receive-only
+  T01..T88 matrix.
 - Resolve P0-P2 findings, then obtain a fresh exact-HEAD no-blocker review.
 - Merge only with squash after applicable gates pass. Do not merge as part of
   implementation work unless the operator explicitly requests that boundary.
