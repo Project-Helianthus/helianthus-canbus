@@ -9,6 +9,7 @@ temporary_directory="$(mktemp -d)"
 trap 'rm -rf "$temporary_directory"' EXIT
 
 echo "==> terminology gate"
+./scripts/require_ripgrep.sh
 ./scripts/terminology_gate.sh
 
 echo "==> forbidden surface gate"
