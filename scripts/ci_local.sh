@@ -9,6 +9,8 @@ temporary_directory="$(mktemp -d)"
 trap 'rm -rf "$temporary_directory"' EXIT
 
 echo "==> terminology gate"
+echo "==> ripgrep preflight test"
+./scripts/require_ripgrep_test.sh
 ./scripts/require_ripgrep.sh
 ./scripts/terminology_gate.sh
 
