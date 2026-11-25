@@ -143,6 +143,9 @@ func inspectProductSource(root string) error {
 			switch typed := node.(type) {
 			case *ast.FuncDecl:
 				name := strings.ToLower(typed.Name.Name)
+				if submissionAdmitted(path) && admittedSendName(name) {
+					return true
+				}
 				if strings.Contains(name, "send") || strings.Contains(name, "transmit") || strings.Contains(name, "writeframe") ||
 					strings.Contains(name, "outbound") || strings.Contains(name, "encode") || strings.Contains(name, "marshal") ||
 					name == "tx" || strings.HasPrefix(name, "tx") {
@@ -156,6 +159,9 @@ func inspectProductSource(root string) error {
 				}
 				switch selector.Sel.Name {
 				case "Write", "WriteTo", "WriteMsg", "Writev", "Pwrite", "Send", "Sendto", "Sendmsg", "Transmit":
+					if submissionAdmitted(path) {
+						return true
+					}
 					inspectionErr = fmt.Errorf("%s calls forbidden operation %s", path, selector.Sel.Name)
 					return false
 				}
@@ -181,6 +187,20 @@ func inspectProductSource(root string) error {
 		}
 	}
 	return nil
+}
+
+// Package periodic admits frame submission (item 11: «un API pe CAN pentru
+// publicare cu periodicitate deterministica de registri»). Send functions and
+// the socket write call are admitted there. Encoding, marshaling, and every
+// other package stay receive-only.
+func submissionAdmitted(path string) bool {
+	slash := filepath.ToSlash(path)
+	return slash == "periodic" || strings.HasPrefix(slash, "periodic/")
+}
+
+func admittedSendName(name string) bool {
+	return strings.Contains(name, "send") || strings.Contains(name, "transmit") ||
+		strings.Contains(name, "writeframe") || strings.Contains(name, "outbound")
 }
 
 func goFilesFromRoot(root string, testsOnly bool) []string {
