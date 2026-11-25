@@ -5,9 +5,12 @@
 - Keep production code and public APIs generic CAN transport only.
 - Keep product, profile, register, property, and domain semantics outside this
   repository.
-- This milestone is classic CAN and receive-only. Do not add frame submission,
-  active probing, interface configuration, netlink mutation, or controller
-  configuration.
+- This milestone is classic CAN. Package periodic admits frame submission: the
+  transport offers an API on CAN for publication with deterministic periodicity
+  of registers («un API pe CAN pentru publicare cu periodicitate deterministica
+  de registri», item 11), and the driver decides which frame is sent and how
+  often. Do not add active probing, interface configuration, netlink mutation,
+  or controller configuration.
 - Treat externally configured controller listen-only mode as a precondition,
   never as a state this library claims to configure or verify.
 - Do not open a live CAN interface from tests. Use the receive-backend seam and
