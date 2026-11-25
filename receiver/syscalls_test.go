@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type trace struct{ sockets, binds, closes int }
+type trace struct{ sockets, binds, closes, reads int }
 
 func scripted(t *trace, lookup func(string) (*net.Interface, error)) receiver.Syscalls {
 	return receiver.Syscalls{
@@ -24,7 +24,14 @@ func scripted(t *trace, lookup func(string) (*net.Interface, error)) receiver.Sy
 			fds[0].Revents = unix.POLLIN
 			return 1, nil
 		},
-		Read:  func(_ int, b []byte) (int, error) { b[4] = 8; return 16, nil },
+		Read: func(_ int, b []byte) (int, error) {
+			t.reads++
+			b[4] = 8
+			for i := 8; i < 16; i++ {
+				b[i] = byte(t.reads*16 + i)
+			}
+			return 16, nil
+		},
 		Close: func(int) error { t.closes++; return nil },
 	}
 }
@@ -46,6 +53,16 @@ func TestOpenWithReceivedSequence(t *testing.T) {
 	second, err := r.Receive(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+	for i, rec := range [][]byte{first.Raw, second.Raw} {
+		if len(rec) != 16 || rec[4] != 8 {
+			t.Fatalf("record %d header %x", i, rec)
+		}
+		for j := 8; j < 16; j++ {
+			if rec[j] != byte((i+1)*16+j) {
+				t.Fatalf("record %d byte %d = %#x, want supplied byte", i, j, rec[j])
+			}
+		}
 	}
 	if first.Sequence != 1 || second.Sequence != 2 || len(first.Raw) != 16 ||
 		first.Interface.Name() != "synthetic0" || second.Monotonic < first.Monotonic {
