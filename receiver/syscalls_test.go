@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/Project-Helianthus/helianthus-canbus/receiver"
 	"golang.org/x/sys/unix"
@@ -86,6 +87,8 @@ func TestOpenWithReopenCarriesClock(t *testing.T) {
 	if err := a.Close(); err != nil {
 		t.Fatal(err)
 	}
+	const gap = 50 * time.Millisecond
+	time.Sleep(gap)
 	b, err := receiver.OpenWith("synthetic0", ops)
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +97,7 @@ func TestOpenWithReopenCarriesClock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rb.Sequence != 1 || rb.Monotonic < ra.Monotonic {
+	if rb.Sequence != 1 || rb.Monotonic-ra.Monotonic < gap {
 		t.Fatalf("clock restarted: %v then %v", ra.Monotonic, rb.Monotonic)
 	}
 }

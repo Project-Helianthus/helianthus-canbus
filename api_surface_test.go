@@ -45,6 +45,38 @@ func TestFramePublicSurfacePreservesPayloadAndWireDLC(t *testing.T) {
 	}
 }
 
+// TestReceiverSuppliedOperationsSurfaceIsRecorded records the two exported
+// additions of the receiver entry point that runs on supplied socket
+// operations: the constructor OpenWith and its operand type Syscalls.
+func TestReceiverSuppliedOperationsSurfaceIsRecorded(t *testing.T) {
+	t.Parallel()
+
+	file, err := parser.ParseFile(token.NewFileSet(), filepath.Join("receiver", "syscalls_linux.go"), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, decl := range file.Decls {
+		switch d := decl.(type) {
+		case *ast.FuncDecl:
+			if d.Recv == nil && d.Name.IsExported() {
+				got = append(got, d.Name.Name)
+			}
+		case *ast.GenDecl:
+			for _, spec := range d.Specs {
+				if ts, ok := spec.(*ast.TypeSpec); ok && ts.Name.IsExported() {
+					got = append(got, ts.Name.Name)
+				}
+			}
+		}
+	}
+	sort.Strings(got)
+	want := []string{"OpenWith", "Syscalls"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("receiver supplied-operations exports = %v, want exactly %v", got, want)
+	}
+}
+
 func TestProductCodeHasNoOutboundOrMutationSurface(t *testing.T) {
 	t.Parallel()
 

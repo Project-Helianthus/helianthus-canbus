@@ -6,7 +6,7 @@ cd "$repo_root"
 export GOWORK=off
 
 echo "==> generic scope; frame submission is admitted in package periodic (item 11)"
-go test -count=1 -run '^(TestListenerPublicSurfaceIsReceiveOnly|TestProductCodeHasNoOutboundOrMutationSurface|TestTestsDoNotOpenAPlatformEndpoint|TestRepositoryHasNoDomainSpecificAssumptions)$' .
+go test -count=1 -run '^(TestListenerPublicSurfaceIsReceiveOnly|TestProductCodeHasNoOutboundOrMutationSurface|TestReceiverSuppliedOperationsSurfaceIsRecorded|TestTestsDoNotOpenAPlatformEndpoint|TestRepositoryHasNoDomainSpecificAssumptions)$' .
 
 # Item 11: «un API pe CAN pentru publicare cu periodicitate deterministica de registri».
 # The socket write of a frame is admitted only in package periodic.
